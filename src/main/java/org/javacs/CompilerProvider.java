@@ -15,6 +15,8 @@ public interface CompilerProvider {
 
     List<String> packagePrivateTopLevelTypes(String packageName);
 
+    List<String> staticImportCandidates(String simpleName);
+
     Iterable<Path> search(String query);
 
     Optional<JavaFileObject> findAnywhere(String className);

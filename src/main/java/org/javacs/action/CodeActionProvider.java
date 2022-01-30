@@ -30,9 +30,11 @@ public class CodeActionProvider {
                         params.textDocument.uri.getPath(), params.range.start.line + 1));
         var started = Instant.now();
         var file = Paths.get(params.textDocument.uri);
-        // TODO this get-map / convert-to-CodeAction split is an ugly workaround of the fact that we need a new compile
+        // TODO this get-map / convert-to-CodeAction split is an ugly workaround of the fact that we
+        // need a new compile
         // task to generate the code actions
-        // If we switch to resolving code actions asynchronously using Command, that will fix this problem.
+        // If we switch to resolving code actions asynchronously using Command, that will fix this
+        // problem.
         var rewrites = new TreeMap<String, Rewrite>();
         try (var task = compiler.compile(file)) {
             var elapsed = Duration.between(started, Instant.now()).toMillis();
@@ -166,16 +168,18 @@ public class CodeActionProvider {
                 return createQuickFix("Add 'throws'", addThrows);
             case "compiler.err.cant.resolve":
             case "compiler.err.cant.resolve.location":
-                var simpleName = extractRange(task, d.range);
-                var allImports = new ArrayList<CodeAction>();
-                for (var qualifiedName : compiler.publicTopLevelTypes()) {
-                    if (qualifiedName.endsWith("." + simpleName)) {
-                        var title = "Import '" + qualifiedName + "'";
-                        var addImport = new AddImport(file, qualifiedName);
-                        allImports.addAll(createQuickFix(title, addImport));
+                {
+                    var simpleName = extractRange(task, d.range);
+                    var allImports = new ArrayList<CodeAction>();
+                    for (var qualifiedName : compiler.publicTopLevelTypes()) {
+                        if (qualifiedName.endsWith("." + simpleName)) {
+                            var title = "Import '" + qualifiedName + "'";
+                            var addImport = new AddImport(file, qualifiedName);
+                            allImports.addAll(createQuickFix(title, addImport));
+                        }
                     }
+                    return allImports;
                 }
-                return allImports;
             case "compiler.err.var.not.initialized.in.default.constructor":
                 var needsConstructor = findClassNeedingConstructor(task, d.range);
                 if (needsConstructor == null) return List.of();
@@ -186,8 +190,18 @@ public class CodeActionProvider {
                 var implementAbstracts = new ImplementAbstractMethods(missingAbstracts);
                 return createQuickFix("Implement abstract methods", implementAbstracts);
             case "compiler.err.cant.resolve.location.args":
-                var missingMethod = new CreateMissingMethod(file, findPosition(task, d.range.start));
-                return createQuickFix("Create missing method", missingMethod);
+                {
+                    var simpleName = extractRange(task, d.range);
+                    var actions = new ArrayList<CodeAction>();
+                    for (var qualifiedName : compiler.staticImportCandidates(simpleName.toString())) {
+                        var title = "Import '" + qualifiedName + "'";
+                        var addImport = new AddImport(file, qualifiedName, true);
+                        actions.addAll(createQuickFix(title, addImport));
+                    }
+                    var missingMethod = new CreateMissingMethod(file, findPosition(task, d.range.start));
+                    actions.addAll(createQuickFix("Create missing method", missingMethod));
+                    return actions;
+                }
             default:
                 return List.of();
         }

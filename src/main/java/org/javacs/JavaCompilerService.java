@@ -14,8 +14,10 @@ class JavaCompilerService implements CompilerProvider {
     final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
-    final Set<String> jdkClasses = ImportCandidateScanner.getJDKClasses();
+    final Set<String> jdkClasses;
+    final Set<String> jdkStaticImportables;
     final Set<String> classPathClasses;
+    final Set<String> classPathStaticImportables;
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
@@ -36,7 +38,12 @@ class JavaCompilerService implements CompilerProvider {
         this.docPath = Collections.unmodifiableSet(docPath);
         this.addExports = Collections.unmodifiableSet(addExports);
         this.docs = new Docs(docPath);
-        this.classPathClasses = ImportCandidateScanner.getClasses(classPath);
+        var jdkCandidates = ImportCandidateScanner.getJDKClasses();
+        this.jdkClasses = jdkCandidates.classes;
+        this.jdkStaticImportables = jdkCandidates.staticImportables;
+        var classPathCandidates = ImportCandidateScanner.getClasses(classPath);
+        this.classPathClasses = classPathCandidates.classes;
+        this.classPathStaticImportables = classPathCandidates.staticImportables;
         this.fileManager = new SourceFileManager();
     }
 
@@ -204,6 +211,23 @@ class JavaCompilerService implements CompilerProvider {
     @Override
     public List<String> packagePrivateTopLevelTypes(String packageName) {
         return List.of("TODO");
+    }
+
+    @Override
+    public List<String> staticImportCandidates(String simpleName) {
+        var suffix = "." + simpleName;
+        var all = new ArrayList<String>();
+        for (var si : jdkStaticImportables) {
+            if (si.endsWith(suffix)) {
+                all.add(si);
+            }
+        }
+        for (var si : classPathStaticImportables) {
+            if (si.endsWith(suffix)) {
+                all.add(si);
+            }
+        }
+        return all;
     }
 
     private boolean containsImport(Path file, String className) {
