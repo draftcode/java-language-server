@@ -6,6 +6,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
@@ -14,6 +15,9 @@ import org.javacs.FileStore;
 import org.javacs.lsp.*;
 
 public class ErrorProvider {
+    private static final Set<String> unusedIgnoredNames =
+            Set.of("serialVersionUID", "readObject", "writeObject", "readObjectNoData", "readResolve", "writeReplace");
+
     final CompileTask task;
 
     public ErrorProvider(CompileTask task) {
@@ -50,7 +54,10 @@ public class ErrorProvider {
         var warnUnused = new WarnUnused(task.task);
         warnUnused.scan(root, null);
         for (var unusedEl : warnUnused.notUsed()) {
-            result.add(warnUnused(unusedEl));
+            var diagnostics = warnUnused(unusedEl);
+            if (diagnostics != null) {
+                result.add(diagnostics);
+            }
         }
         return result;
     }
@@ -141,6 +148,13 @@ public class ErrorProvider {
         var name = unusedEl.getSimpleName();
         if (name.contentEquals("<init>")) {
             name = unusedEl.getEnclosingElement().getSimpleName();
+        }
+        var nameStr = name.toString();
+        if (nameStr.startsWith("unused")) {
+            return null;
+        }
+        if (unusedIgnoredNames.contains(nameStr)) {
+            return null;
         }
         var region = contents.subSequence(start, end);
         var matcher = Pattern.compile("\\b" + name + "\\b").matcher(region);
