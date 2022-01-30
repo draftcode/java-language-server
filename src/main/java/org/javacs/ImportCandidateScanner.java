@@ -16,7 +16,7 @@ import java.util.Set;
 class ImportCandidateScanner {
     private ImportCandidateScanner() {}
 
-    static Set<String> getJDKClasses() {
+    static ImportCandidates getJDKClasses() {
         var packages = new HashSet<String>();
         for (var moduleRef : ModuleFinder.ofSystem().findAll()) {
             for (var exports : moduleRef.descriptor().exports()) {
@@ -27,6 +27,7 @@ class ImportCandidateScanner {
         }
 
         var classes = new HashSet<String>();
+        var staticImportables = new HashSet<String>();
         try (ScanResult scanResult =
                 new ClassGraph()
                         .overrideClassLoaders(ClassLoader.getSystemClassLoader())
@@ -44,16 +45,23 @@ class ImportCandidateScanner {
                 }
 
                 indexClass(classes, ci);
+                for (var mi : ci.getDeclaredMethodAndConstructorInfo()) {
+                    indexMethod(staticImportables, mi);
+                }
+                for (var fi : ci.getDeclaredFieldInfo()) {
+                    indexField(staticImportables, fi);
+                }
             }
         }
-        return classes;
+        return new ImportCandidates(classes, staticImportables);
     }
 
-    static Set<String> getClasses(Set<Path> classPath) {
+    static ImportCandidates getClasses(Set<Path> classPath) {
         var urls = classPath.stream().map(ImportCandidateScanner::toUrl).toArray(URL[]::new);
         var classLoader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader());
 
         var classes = new HashSet<String>();
+        var staticImportables = new HashSet<String>();
         try (ScanResult scanResult =
                 new ClassGraph()
                         .overrideClassLoaders(classLoader)
@@ -70,9 +78,15 @@ class ImportCandidateScanner {
                 }
 
                 indexClass(classes, ci);
+                for (var mi : ci.getDeclaredMethodAndConstructorInfo()) {
+                    indexMethod(staticImportables, mi);
+                }
+                for (var fi : ci.getDeclaredFieldInfo()) {
+                    indexField(staticImportables, fi);
+                }
             }
         }
-        return classes;
+        return new ImportCandidates(classes, staticImportables);
     }
 
     private static URL toUrl(Path p) {
@@ -87,17 +101,50 @@ class ImportCandidateScanner {
         String name = ci.getSimpleName();
         String packageName = ci.getPackageName();
         String containedClass = getMiddle(ci.getName().replace('$', '.'), packageName, name);
-        String fqcn = packageName;
+        classes.add(buildFQN(packageName, containedClass, name));
+    }
 
+    private static void indexMethod(Set<String> staticImportables, MethodInfo mi) {
+        if (!mi.isStatic()) {
+            return;
+        }
+        Visibility visibility = Visibility.ofMethod(mi);
+        if (visibility == null) {
+            return;
+        }
+
+        String name = mi.getName();
+        String packageName = mi.getClassInfo().getPackageName();
+        String containedClass = getMiddle(mi.getClassName().replace('$', '.') + '.' + name, packageName, name);
+        staticImportables.add(buildFQN(packageName, containedClass, name));
+    }
+
+    private static void indexField(Set<String> staticImportables, FieldInfo fi) {
+        if (!fi.isStatic()) {
+            return;
+        }
+        Visibility visibility = Visibility.ofField(fi);
+        if (visibility == null) {
+            return;
+        }
+
+        String name = fi.getName();
+        String packageName = fi.getClassInfo().getPackageName();
+        String containedClass = getMiddle(fi.getClassName().replace('$', '.') + '.' + name, packageName, name);
+        staticImportables.add(buildFQN(packageName, containedClass, name));
+    }
+
+    private static String buildFQN(String packageName, String containedClass, String name) {
+        String fqn = packageName;
         if (!containedClass.isEmpty()) {
-            fqcn += "." + containedClass;
+            fqn += "." + containedClass;
         }
-        if (fqcn.isEmpty()) {
-            fqcn = name;
+        if (fqn.isEmpty()) {
+            fqn = name;
         } else {
-            fqcn += "." + name;
+            fqn += "." + name;
         }
-        classes.add(fqcn);
+        return fqn;
     }
 
     private static String getMiddle(String fullName, String packageName, String simpleName) {
@@ -109,6 +156,16 @@ class ImportCandidateScanner {
             return "";
         }
         return s.substring(0, s.length() - simpleName.length() - 1);
+    }
+
+    static class ImportCandidates {
+        final Set<String> classes;
+        final Set<String> staticImportables;
+
+        ImportCandidates(Set<String> classes, Set<String> staticImportables) {
+            this.classes = classes;
+            this.staticImportables = staticImportables;
+        }
     }
 
     private enum Visibility {

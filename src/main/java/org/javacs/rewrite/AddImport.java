@@ -13,17 +13,28 @@ import org.javacs.lsp.TextEdit;
 public class AddImport implements Rewrite {
     final Path file;
     final String className;
+    final boolean isStatic;
 
     public AddImport(Path file, String className) {
+        this(file, className, false);
+    }
+
+    public AddImport(Path file, String className, boolean isStatic) {
         this.file = file;
         this.className = className;
+        this.isStatic = isStatic;
     }
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         var task = compiler.parse(file);
         var point = insertPosition(task);
-        var text = "import " + className + ";\n";
+        String text;
+        if (isStatic) {
+            text = "import static " + className + ";\n";
+        } else {
+            text = "import " + className + ";\n";
+        }
         TextEdit[] edits = {new TextEdit(new Range(point, point), text)};
         return Map.of(file, edits);
     }
