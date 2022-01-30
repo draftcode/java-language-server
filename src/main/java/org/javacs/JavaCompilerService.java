@@ -14,7 +14,8 @@ class JavaCompilerService implements CompilerProvider {
     final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
-    final Set<String> jdkClasses = ScanClassPath.jdkTopLevelClasses(), classPathClasses;
+    final Set<String> jdkClasses = ImportCandidateScanner.getJDKClasses();
+    final Set<String> classPathClasses;
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
@@ -35,7 +36,7 @@ class JavaCompilerService implements CompilerProvider {
         this.docPath = Collections.unmodifiableSet(docPath);
         this.addExports = Collections.unmodifiableSet(addExports);
         this.docs = new Docs(docPath);
-        this.classPathClasses = ScanClassPath.classPathTopLevelClasses(classPath);
+        this.classPathClasses = ImportCandidateScanner.getClasses(classPath);
         this.fileManager = new SourceFileManager();
     }
 
