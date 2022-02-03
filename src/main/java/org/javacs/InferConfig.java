@@ -16,6 +16,8 @@ import java.util.stream.Stream;
 
 class InferConfig {
     private static final Logger LOG = Logger.getLogger("main");
+    private static final String BAZEL_EXCLUDED_JAR =
+            "external/bazel_tools/tools/jdk/_ijar/TestRunner/java_tools/Runner_deploy-ijar.jar";
 
     /** Root of the workspace that is currently open in VSCode */
     private final Path workspaceRoot;
@@ -421,6 +423,12 @@ class InferConfig {
                 continue;
             }
             var relative = artifact.getExecPath();
+            if (relative.endsWith(BAZEL_EXCLUDED_JAR)) {
+                // Temp hack for Runner_deploy-ijar.jar leaks
+                // Similar issue to the IntelliJ plugin.
+                // https://github.com/bazelbuild/intellij/issues/1844
+                continue;
+            }
             LOG.info("...found bazel dependency " + relative);
             artifactPaths.add(relative);
         }
@@ -454,6 +462,12 @@ class InferConfig {
             var relative = buildPath(container.getPathFragmentsList(), artifact.getPathFragmentId());
             if (!argumentPaths.contains(relative)) {
                 // artifact was not specified by --filterArgument
+                continue;
+            }
+            if (relative.endsWith(BAZEL_EXCLUDED_JAR)) {
+                // Temp hack for Runner_deploy-ijar.jar leaks
+                // Similar issue to the IntelliJ plugin.
+                // https://github.com/bazelbuild/intellij/issues/1844
                 continue;
             }
             LOG.info("...found bazel dependency " + relative);
