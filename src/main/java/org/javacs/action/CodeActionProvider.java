@@ -171,12 +171,10 @@ public class CodeActionProvider {
                 {
                     var simpleName = extractRange(task, d.range);
                     var allImports = new ArrayList<CodeAction>();
-                    for (var qualifiedName : compiler.publicTopLevelTypes()) {
-                        if (qualifiedName.endsWith("." + simpleName)) {
-                            var title = "Import '" + qualifiedName + "'";
-                            var addImport = new AddImport(file, qualifiedName);
-                            allImports.addAll(createQuickFix(title, addImport));
-                        }
+                    for (var qualifiedName : compiler.classImportCandidates(simpleName.toString())) {
+                        var title = "Import '" + qualifiedName + "'";
+                        var addImport = new AddImport(file, qualifiedName);
+                        allImports.addAll(createQuickFix(title, addImport));
                     }
                     return allImports;
                 }

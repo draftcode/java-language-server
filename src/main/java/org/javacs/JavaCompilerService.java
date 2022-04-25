@@ -23,8 +23,10 @@ class JavaCompilerService implements CompilerProvider {
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final SourceFileManager fileManager;
+    final ImportCandidatePreference importCandidatePreference;
 
-    JavaCompilerService(Set<Path> classPath, Set<Path> docPath, Set<String> addExports) {
+    JavaCompilerService(Set<Path> classPath, Set<Path> docPath, Set<String> addExports,
+        ImportCandidatePreference importCandidatePreference) {
         System.err.println("Class path:");
         for (var p : classPath) {
             System.err.println("  " + p);
@@ -45,6 +47,7 @@ class JavaCompilerService implements CompilerProvider {
         this.classPathClasses = classPathCandidates.classes;
         this.classPathStaticImportables = classPathCandidates.staticImportables;
         this.fileManager = new SourceFileManager();
+        this.importCandidatePreference = importCandidatePreference;
     }
 
     private CompileBatch cachedCompile;
@@ -215,19 +218,40 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public List<String> staticImportCandidates(String simpleName) {
+        var resolver = importCandidatePreference.getResolver(simpleName);
+        var exclusiveCandidates = resolver.getExclusiveCandidates();
+        if (!exclusiveCandidates.isEmpty()) {
+            return exclusiveCandidates;
+        }
         var suffix = "." + simpleName;
         var all = new ArrayList<String>();
         for (var si : jdkStaticImportables) {
-            if (si.endsWith(suffix)) {
+            if (!resolver.shouldIgnore(si) && si.endsWith(suffix)) {
                 all.add(si);
             }
         }
         for (var si : classPathStaticImportables) {
-            if (si.endsWith(suffix)) {
+            if (!resolver.shouldIgnore(si) && si.endsWith(suffix)) {
                 all.add(si);
             }
         }
         return all;
+    }
+
+    @Override
+    public List<String> classImportCandidates(String simpleName) {
+        var resolver = importCandidatePreference.getResolver(simpleName);
+        var exclusiveCandidates = resolver.getExclusiveCandidates();
+        if (!exclusiveCandidates.isEmpty()) {
+            return exclusiveCandidates;
+        }
+        var ret = new ArrayList<String>();
+        for (var qualifiedName : publicTopLevelTypes()) {
+            if (!resolver.shouldIgnore(qualifiedName) && qualifiedName.endsWith("." + simpleName)) {
+                ret.add(qualifiedName);
+            }
+        }
+        return ret;
     }
 
     private boolean containsImport(Path file, String className) {

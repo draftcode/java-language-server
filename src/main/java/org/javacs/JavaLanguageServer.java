@@ -93,10 +93,11 @@ class JavaLanguageServer extends LanguageServer {
         var externalDependencies = externalDependencies();
         var classPath = classPath();
         var addExports = addExports();
+        var importCandidatePreference = new ImportCandidatePreference(workspaceRoot);
         // If classpath is specified by the user, don't infer anything
         if (!classPath.isEmpty()) {
             javaEndProgress();
-            return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
+            return new JavaCompilerService(classPath, Collections.emptySet(), addExports, importCandidatePreference);
         }
         // Otherwise, combine inference with user-specified external dependencies
         else {
@@ -109,7 +110,7 @@ class JavaLanguageServer extends LanguageServer {
             var docPath = infer.buildDocPath();
 
             javaEndProgress();
-            return new JavaCompilerService(classPath, docPath, addExports);
+            return new JavaCompilerService(classPath, docPath, addExports, importCandidatePreference);
         }
     }
 

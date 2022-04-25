@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package javacs;
+
+option java_package = "org.javacs.proto";
+
+message Config {
+  message ImportCandidateRule {
+    string missing_identifier_pattern = 1;
+    repeated string ignore_candidate_patterns = 2;
+    repeated string exclusive_candidates = 3;
+  }
+  repeated ImportCandidateRule import_candidate_rules = 1;
+}

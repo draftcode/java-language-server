@@ -17,6 +17,8 @@ public interface CompilerProvider {
 
     List<String> staticImportCandidates(String simpleName);
 
+    List<String> classImportCandidates(String simpleName);
+
     Iterable<Path> search(String query);
 
     Optional<JavaFileObject> findAnywhere(String className);
